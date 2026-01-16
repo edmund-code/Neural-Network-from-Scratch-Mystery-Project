@@ -1,141 +1,42 @@
-# Neural-Network-from-Scratch-Mystery-Project
-## Cross-Validated Model Comparison (5-Fold CV)
+# Neural Networks from Scratch: Mystery Dataset Classification
 
-We evaluate three models using **stratified 5-fold cross-validation**.  
-All metrics are reported on **held-out folds only** (no data leakage).
+[cite_start]This project aims to develop the most effective Multi-Layer Perceptron (MLP) to classify a "mystery" tabular dataset[cite: 1, 5]. [cite_start]The project explores various neural network architectures, loss functions, and regularization techniques to handle challenges like class imbalance and overfitting[cite: 13, 161, 282, 702].
 
----
+## Dataset Overview
+The dataset consists of CSV tabular data with the following specifications:
+* [cite_start]**Training Set:** 8,000 examples with 205 features and class labels (0, 1, 2, 3, 4)[cite: 9, 10].
+* [cite_start]**Test Set:** 2,000 examples with 205 features (unlabeled)[cite: 11].
+* [cite_start]**Key Observations:** * **Class Imbalance:** There is a significant imbalance, with Class 0 having nearly 4,000 examples while Class 4 has fewer than 500[cite: 14, 15, 16, 23].
+    * [cite_start]**Feature Correlation:** Features are roughly uncorrelated (using Pearson's correlation), indicating no major multicollinearity issues[cite: 29, 30, 34].
+    * [cite_start]**Low Variance:** PCA analysis shows that the first 50 components explain only 47.6% of the variance, suggesting class differences rely on subtle, non-obvious patterns[cite: 45, 55].
 
-### Best XGBoost (Nested CV, class-weighted)
+## Model Development & Results
 
-| Class | Precision | Recall | F1-score |
-|------|-----------|--------|----------|
-| 0 | 0.856 | 0.963 | 0.906 |
-| 1 | 0.824 | 0.849 | 0.837 |
-| 2 | 0.839 | 0.764 | 0.800 |
-| 3 | 0.798 | 0.582 | 0.673 |
-| 4 (rarest) | **0.728** | **0.330** | **0.454** |
+### Baseline: XGBoost
+* [cite_start]**Method:** 5-fold cross-validation with 660 estimators and inverse class weighting[cite: 115].
+* [cite_start]**Performance:** Achieved **0.84 accuracy** but performed poorly on smaller classes (Recall for Class 4 was only 0.330)[cite: 116, 117, 139].
 
-**Overall Performance**
-- **Accuracy:** 0.840  
-- **Macro-F1:** 0.734  
-- **Weighted-F1:** 0.830  
+### MLP Architectures Explored
+The project iteratively tested several MLP configurations:
 
----
+| Model | Description | Accuracy | Key Takeaway |
+| :--- | :--- | :--- | :--- |
+| **Model 1** | [cite_start]Standard MLP (2 hidden layers: 512, 256) with Dropout (0.35)[cite: 156, 157]. | **0.874** | [cite_start]Beat XGBoost; clear signs of overfitting[cite: 164, 174, 184]. |
+| **Model 2** | [cite_start]Standard MLP with Focal Loss to focus on "hard" examples (smaller classes)[cite: 282, 294]. | 0.857 | Performance dropped; [cite_start]Focal Loss was sensitive to outliers[cite: 334, 389]. |
+| **Model 4** | [cite_start]Wide & Deep NN (Input fed to logits + 3 hidden layers)[cite: 412, 416, 417]. | 0.859 | [cite_start]Improved overfitting/stability but lower overall accuracy[cite: 525, 528]. |
+| **Model 5** | [cite_start]Two-Stage Classifier (Binary detector for Class 4, then multiclass for 0-3)[cite: 544, 547]. | 0.861 | [cite_start]Errors from the first stage propagated to the second[cite: 612, 658]. |
+| **Model 6** | [cite_start]**Standard MLP + Light Regularization** (Label smoothing, early stopping, more weight decay)[cite: 702, 703]. | **0.879** | [cite_start]**Best performing model**; smoothed loss and accuracy curves[cite: 765, 776]. |
 
-### Best MLP (Class-Weighted Cross-Entropy)
+## Final Model Selection: Model 6
+[cite_start]The final model utilized a standard MLP architecture with enhanced regularization to achieve the best balance of generalization and accuracy[cite: 787, 789].
 
-| Class | Precision | Recall | F1-score |
-|------|-----------|--------|----------|
-| 0 | 0.910 | 0.932 | 0.921 |
-| 1 | 0.834 | 0.881 | 0.857 |
-| 2 | 0.831 | 0.824 | 0.828 |
-| 3 | 0.807 | 0.705 | 0.752 |
-| 4 (rarest) | **0.715** | **0.581** | **0.641** |
+* [cite_start]**Top Features:** Feature indices `f132`, `f187`, and `f157` were identified as the most important via permutation importance[cite: 861].
+* [cite_start]**Final Accuracy:** High 80s (approximately 0.879)[cite: 765, 867].
 
-**Overall Performance**
-- **Accuracy:** **0.865**  
-- **Macro-F1:** **0.800**  
-- **Weighted-F1:** **0.863**  
-
-**Strong baseline model**  
-Excellent rare-class recall compared to XGBoost.
+## Conclusions
+* [cite_start]Class imbalance was the primary factor limiting model performance[cite: 868].
+* [cite_start]Advanced techniques (Focal Loss, Two-Stage classification) often overcomplicated the task and led to worse results than a well-regularized simple MLP[cite: 869, 870].
 
 ---
-
-### Best MLP (Focal Loss)
-
-| Class | Precision | Recall | F1-score |
-|------|-----------|--------|----------|
-| 0 | 0.939 | 0.910 | 0.924 |
-| 1 | 0.858 | 0.903 | 0.880 |
-| 2 | 0.781 | 0.837 | 0.808 |
-| 3 | 0.737 | 0.778 | 0.757 |
-| 4 (rarest) | **0.778** | **0.605** | **0.681** |
-
-**Overall Performance**
-- **Accuracy:** **0.869**  
-- **Macro-F1:** **0.810**  
-- **Weighted-F1:** **0.869**  
-
-**Best overall model**  
-Focal loss further improves rare class performance (F1 0.68 vs 0.64) while maintaining higher overall accuracy.
-
----
-
----
-
-### 4️⃣ Two-Stage MLP (Class-4 Detector + 0–3 Multiclass)
-
-We also evaluated a **two-stage classifier**:
-1. **Stage A:** binary classifier for `class 4 vs rest`
-2. **Stage B:** multiclass classifier for `classes 0–3`
-3. Final prediction uses a tuned threshold on the class-4 probability
-
-This approach is often effective when one class is extremely rare.
-
-#### Cross-Validated Performance
-
-| Class | Precision | Recall | F1-score |
-|------|-----------|--------|----------|
-| 0 | 0.901 | 0.883 | 0.892 |
-| 1 | 0.795 | 0.837 | 0.816 |
-| 2 | 0.765 | 0.750 | 0.758 |
-| 3 | 0.709 | 0.681 | 0.695 |
-| 4 (rarest) | 0.288 | 0.328 | 0.306 |
-
-**Overall Performance**
-- **Accuracy:** 0.805  
-- **Macro-F1:** 0.693  
-- **Weighted-F1:** 0.807  
-
----
-
-#### Interpretation
-
-Although the two-stage architecture is theoretically well-suited for rare-class detection, it **underperformed** compared to the single-stage MLP:
-
-- Class-4 precision collapsed due to error compounding
-- Stage-A false positives propagate to final predictions
-- Shared representation in the single-stage MLP proved more effective
-
-This suggests that **class 4 does not form a cleanly separable sub-problem**, and that joint representation learning is critical for this dataset.
-
----
-
-#### Final Model Ranking (by Macro-F1)
-
-1. **MLP with Focal Loss: 0.810**
-2. MLP with Weighted CE: 0.800
-3. XGBoost (nested CV): 0.734
-4. Two-Stage MLP: 0.693
-
----
-
-#### Takeaway
-
-> Explicitly separating the rare class was less effective than allowing a single neural network to learn shared structure across all classes.
-> Focal loss provided a tangible benefit over standard weighted cross-entropy, particularly for the rarest class.
-
-Negative results are reported for completeness and reproducibility.
-
-
-
-## Key Takeaways
-
-- **MLP outperforms XGBoost** on this dataset
-  - +2.9% absolute accuracy
-  - +7.6 macro-F1 points
-- **Rare-class performance is the main differentiator**
-  - XGBoost is conservative (high precision, low recall)
-  - MLP learns a stronger shared representation
-- **Best final choice:** **MLP with Focal Loss**
-- **Focal loss is optimal** for this task, providing the best balance of precision and recall for the minority class.
-
----
-
-## Interpretation
-
-> Tree-based models struggle to learn stable decision boundaries for extremely small classes.  
-> A neural network with shared representations generalizes better, significantly improving recall for rare categories while maintaining strong overall performance.
-> Focal loss successfully emphasizes hard examples, leading to superior performance on the rarest class without sacrificing overall accuracy.
+[cite_start]**Author:** Edmund Tsou [cite: 2]  
+[cite_start]**Institution:** Johns Hopkins University [cite: 3]
